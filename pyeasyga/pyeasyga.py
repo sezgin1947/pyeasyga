@@ -7,6 +7,7 @@
 import random
 import copy
 from operator import attrgetter
+import time
 
 from six.moves import range
 
@@ -40,9 +41,7 @@ class GeneticAlgorithm(object):
                  crossover_probability=0.8,
                  mutation_probability=0.2,
                  elitism=True,
-                 maximise_fitness=True,
-                 verbose=False,
-                 random_state=None):
+                 maximise_fitness=True):
         """Instantiate the Genetic Algorithm.
 
         :param seed_data: input data to the Genetic Algorithm
@@ -51,7 +50,6 @@ class GeneticAlgorithm(object):
         :param int generations: number of generations to evolve
         :param float crossover_probability: probability of crossover operation
         :param float mutation_probability: probability of mutation operation
-        :param int: random seed. defaults to None
 
         """
 
@@ -62,10 +60,6 @@ class GeneticAlgorithm(object):
         self.mutation_probability = mutation_probability
         self.elitism = elitism
         self.maximise_fitness = maximise_fitness
-        self.verbose = verbose
-
-        # seed random number generator
-        self.random = random.Random(random_state)
 
         self.current_generation = []
 
@@ -81,7 +75,7 @@ class GeneticAlgorithm(object):
             :returns: candidate solution representation as a list
 
             """
-            return [self.random.randint(0, 1) for _ in range(len(seed_data))]
+            return [random.randint(0, 1) for _ in range(len(seed_data))]
 
         def crossover(parent_1, parent_2):
             """Crossover (mate) two parents to produce two children.
@@ -91,19 +85,19 @@ class GeneticAlgorithm(object):
             :returns: tuple containing two children
 
             """
-            index = self.random.randrange(1, len(parent_1))
+            index = random.randrange(1, len(parent_1))
             child_1 = parent_1[:index] + parent_2[index:]
             child_2 = parent_2[:index] + parent_1[index:]
             return child_1, child_2
 
         def mutate(individual):
             """Reverse the bit of a random index in an individual."""
-            mutate_index = self.random.randrange(len(individual))
+            mutate_index = random.randrange(len(individual))
             individual[mutate_index] = (0, 1)[individual[mutate_index] == 0]
 
         def random_selection(population):
             """Select and return a random member of the population."""
-            return self.random.choice(population)
+            return random.choice(population)
 
         def tournament_selection(population):
             """Select a random number of individuals from the population and
@@ -111,7 +105,7 @@ class GeneticAlgorithm(object):
             """
             if self.tournament_size == 0:
                 self.tournament_size = 2
-            members = self.random.sample(population, self.tournament_size)
+            members = random.sample(population, self.tournament_size)
             members.sort(
                 key=attrgetter('fitness'), reverse=self.maximise_fitness)
             return members[0]
@@ -165,8 +159,8 @@ class GeneticAlgorithm(object):
             child_1, child_2 = parent_1, parent_2
             child_1.fitness, child_2.fitness = 0, 0
 
-            can_crossover = self.random.random() < self.crossover_probability
-            can_mutate = self.random.random() < self.mutation_probability
+            can_crossover = random.random() < self.crossover_probability
+            can_mutate = random.random() < self.mutation_probability
 
             if can_crossover:
                 child_1.genes, child_2.genes = self.crossover_function(
@@ -200,15 +194,26 @@ class GeneticAlgorithm(object):
         self.create_new_population()
         self.calculate_population_fitness()
         self.rank_population()
-        if self.verbose:
-            print("Fitness: %f" % self.best_individual()[0])
 
     def run(self):
         """Run (solve) the Genetic Algorithm."""
         self.create_first_generation()
-
-        for _ in range(1, self.generations):
-            self.create_next_generation()
+        best_fitnesses = []
+        elapsed_time = 0
+        update_count = 100
+        for i in range(1, self.generations):
+            start_time = time.time()
+            ind = self.best_individual()
+            best_fitnesses.append(ind)
+            self.create_next_generation()    
+            elapsed_time += time.time() - start_time
+            if i % update_count == 0:
+                print('current :', i, 'total:', self.generations)
+                elapsed_time = elapsed_time / update_count
+                print('Estimated Time :', elapsed_time * (self.generations - i)//60, ' minutes',
+                     elapsed_time * (self.generations - i) % 60, ' seconds')
+                elapsed_time = 0
+        return best_fitnesses
 
     def best_individual(self):
         """Return the individual with the best fitness in the current
